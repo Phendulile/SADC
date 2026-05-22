@@ -185,16 +185,25 @@ export default function App() {
       {/* SADC Secure Network Global Header Bar */}
       <header className="sticky top-0 z-50 bg-slate-950/90 backdrop-blur-md border-b border-slate-800 px-4 sm:px-6 py-4">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-3 cursor-pointer" onClick={() => setSelectedCountry(null)}>
+          <div 
+            id="global-header-logo"
+            className="flex items-center gap-3 cursor-pointer hover:opacity-90 active:scale-[0.98] transition-all duration-200 select-none group" 
+            onClick={() => { 
+              setSelectedCountry(null); 
+              setShowGlobalResults(false); 
+              setGlobalQuery(''); 
+              setGlobalResults([]);
+            }}
+          >
             {/* SADC Emblem design placeholder: Gold ring with active SADC letters */}
-            <div className="w-10 h-10 rounded-full bg-slate-900 border-2 border-amber-500 flex items-center justify-center shadow-lg shadow-amber-500/10">
-              <span className="text-amber-500 font-extrabold text-sm tracking-tighter">SADC</span>
+            <div className="w-10 h-10 rounded-full bg-slate-900 border-2 border-amber-500 group-hover:border-amber-400 flex items-center justify-center shadow-lg shadow-amber-500/10 transition">
+              <span className="text-amber-500 group-hover:text-amber-400 font-extrabold text-sm tracking-tighter transition">SADC</span>
             </div>
             <div>
-              <span className="font-extrabold text-white text-base tracking-tight leading-none block">
+              <span className="font-extrabold text-white group-hover:text-amber-400 text-base tracking-tight leading-none block transition">
                 ID4AFRICA
               </span>
-              <span className="text-[9px] uppercase font-mono tracking-widest text-amber-500 font-bold block pt-0.5">
+              <span className="text-[9px] uppercase font-mono tracking-widest text-amber-500 group-hover:text-amber-400 font-bold block pt-0.5 transition">
                 Southern Africa SecID Platform
               </span>
             </div>
