@@ -193,6 +193,7 @@ export default function App() {
               setShowGlobalResults(false); 
               setGlobalQuery(''); 
               setGlobalResults([]);
+              window.scrollTo({ top: 0, behavior: 'smooth' });
             }}
           >
             {/* SADC Emblem design placeholder: Gold ring with active SADC letters */}
