@@ -1,6 +1,6 @@
 {
   "name": "SADC Secure ID System",
   "description": "SADC Secure ID System is a regional lost-and-found identity management platform designed to help Southern African citizens recover lost identification documents securely.",
-  "requestFramePermissions": [],
+  "requestFramePermissions": ["microphone"],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

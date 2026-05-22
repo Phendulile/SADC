@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'motion/react';
 import { 
   Search, Shield, Building2, Eye, Award, 
-  HelpCircle, AlertCircle, FileText, ArrowRight, ExternalLink 
+  HelpCircle, AlertCircle, FileText, ArrowRight, ExternalLink,
+  Mic, MicOff
 } from 'lucide-react';
 import { SADC_COUNTRIES, SADCCountry, FoundDocument, SADC_CountryCode } from '../types';
 
@@ -15,6 +16,81 @@ interface LandingHeroProps {
 export default function LandingHero({ onSelectCountry, allDocuments, onGlobalSearch }: LandingHeroProps) {
   const [globalSearch, setGlobalSearch] = useState('');
   const [selectedSearchCountry, setSelectedSearchCountry] = useState<string>('ALL');
+  
+  // Voice Search States
+  const [isListening, setIsListening] = useState(false);
+  const [speechSupported, setSpeechSupported] = useState<boolean | null>(null);
+  const [speechError, setSpeechError] = useState<string | null>(null);
+  const recognitionRef = useRef<any>(null);
+
+  useEffect(() => {
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    setSpeechSupported(!!SpeechRecognition);
+  }, []);
+
+  const toggleListening = () => {
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      setSpeechError("Speech recognition not supported in this browser.");
+      return;
+    }
+
+    setSpeechError(null);
+
+    if (isListening) {
+      if (recognitionRef.current) {
+        recognitionRef.current.stop();
+      }
+      setIsListening(false);
+    } else {
+      try {
+        const recognition = new SpeechRecognition();
+        recognition.lang = 'en-US';
+        // Allows ongoing continuous recognition. Set interim to false for precision.
+        recognition.interimResults = false;
+        recognition.maxAlternatives = 1;
+
+        recognition.onstart = () => {
+          setIsListening(true);
+        };
+
+        recognition.onresult = (event: any) => {
+          const transcript = event.results[0][0].transcript;
+          // Standard SpeechRecognition often adds trailing periods to sentences
+          const cleanedText = transcript.replace(/\.$/, '').trim();
+          setGlobalSearch(cleanedText);
+          
+          // Smooth autocompletion of search if voice captures letters/numbers
+          if (cleanedText) {
+            onGlobalSearch(
+              cleanedText,
+              selectedSearchCountry === 'ALL' ? undefined : selectedSearchCountry as SADC_CountryCode
+            );
+          }
+        };
+
+        recognition.onerror = (event: any) => {
+          console.error('Speech recognition error:', event.error);
+          if (event.error === 'not-allowed') {
+            setSpeechError("Microphone permission denied. Check your browser browser permissions.");
+          } else {
+            setSpeechError(`Feature status: ${event.error}`);
+          }
+          setIsListening(false);
+        };
+
+        recognition.onend = () => {
+          setIsListening(false);
+        };
+
+        recognitionRef.current = recognition;
+        recognition.start();
+      } catch (err: any) {
+        setSpeechError("Failed to initiate voice capture driver.");
+        setIsListening(false);
+      }
+    }
+  };
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -121,8 +197,29 @@ export default function LandingHero({ onSelectCountry, allDocuments, onGlobalSea
               placeholder="Enter ID / Document / Passport Number..."
               value={globalSearch}
               onChange={(e) => setGlobalSearch(e.target.value)}
-              className="w-full bg-slate-950 text-white placeholder-slate-500 pl-11 pr-4 py-3 border border-slate-800 focus:border-amber-500 focus:outline-none rounded-lg text-sm font-semibold tracking-wider font-mono"
+              className="w-full bg-slate-950 text-white placeholder-slate-500 pl-11 pr-14 py-3 border border-slate-800 focus:border-amber-500 focus:outline-none rounded-lg text-sm font-semibold tracking-wider font-mono"
             />
+            {speechSupported !== false && (
+              <button
+                type="button"
+                id="voice-search-btn-hero"
+                onClick={toggleListening}
+                className={`absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-md transition-all duration-200 flex items-center justify-center cursor-pointer ${
+                  isListening 
+                    ? 'bg-rose-500/20 text-rose-400 border border-rose-500/50 animate-pulse' 
+                    : 'text-slate-400 hover:text-amber-500 hover:bg-slate-900 border border-transparent'
+                }`}
+                title="Search by voice"
+              >
+                {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+                {isListening && (
+                  <span className="absolute -top-1 -right-1 flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-rose-500"></span>
+                  </span>
+                )}
+              </button>
+            )}
           </div>
 
           <select
@@ -145,6 +242,23 @@ export default function LandingHero({ onSelectCountry, allDocuments, onGlobalSea
             Run Encrypted Query <ArrowRight className="w-4 h-4" />
           </button>
         </form>
+
+        {isListening && (
+          <motion.div 
+            initial={{ opacity: 0, y: -5 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="flex items-center gap-2 text-xs text-rose-400 bg-rose-950/20 border border-rose-900/40 p-3 rounded-lg animate-pulse font-mono"
+          >
+            <span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-ping shrink-0" />
+            <span>SADC Secure Voice Stream active: Speak your document sequences clearly now...</span>
+          </motion.div>
+        )}
+
+        {speechError && (
+          <div className="text-xs text-amber-500 px-1 font-mono">
+            ⚠️ Voice capture reminder: {speechError} (Confirm mic permissions or type manually)
+          </div>
+        )}
       </div>
 
       {/* Grid of SADC Countries */}

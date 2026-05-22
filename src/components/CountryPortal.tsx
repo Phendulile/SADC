@@ -1,9 +1,10 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   ArrowLeft, Search, ShieldCheck, Mail, Phone, MapPin, 
   Clock, Lock, CheckCircle2, AlertTriangle, RefreshCw, FileText, 
-  UploadCloud, UserCheck, Eye, Trash2, HeartHandshake, Filter, Info, ShieldAlert
+  UploadCloud, UserCheck, Eye, Trash2, HeartHandshake, Filter, Info, ShieldAlert,
+  Mic, MicOff
 } from 'lucide-react';
 import { 
   SADCCountry, 
@@ -52,6 +53,73 @@ export default function CountryPortal({
   const [trackingSearchCode, setTrackingSearchCode] = useState('');
   const [trackedClaim, setTrackedClaim] = useState<IDClaim | null>(null);
   const [trackSearched, setTrackSearched] = useState(false);
+
+  // Voice Search States
+  const [isListening, setIsListening] = useState(false);
+  const [speechSupported, setSpeechSupported] = useState<boolean | null>(null);
+  const [speechError, setSpeechError] = useState<string | null>(null);
+  const recognitionRef = useRef<any>(null);
+
+  useEffect(() => {
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    setSpeechSupported(!!SpeechRecognition);
+  }, []);
+
+  const toggleListening = () => {
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      setSpeechError("Speech recognition not supported in this browser.");
+      return;
+    }
+
+    setSpeechError(null);
+
+    if (isListening) {
+      if (recognitionRef.current) {
+        recognitionRef.current.stop();
+      }
+      setIsListening(false);
+    } else {
+      try {
+        const recognition = new SpeechRecognition();
+        recognition.lang = 'en-US';
+        recognition.interimResults = false;
+        recognition.maxAlternatives = 1;
+
+        recognition.onstart = () => {
+          setIsListening(true);
+        };
+
+        recognition.onresult = (event: any) => {
+          const transcript = event.results[0][0].transcript;
+          const cleanedText = transcript.replace(/\.$/, '').trim();
+          setSearchQuery(cleanedText);
+          setHasSearched(true);
+          onAddAuditLog('Voice Document Search', 'Citizen', `Searched via voice: "${cleanedText}" in country ${country.name}`);
+        };
+
+        recognition.onerror = (event: any) => {
+          console.error('Speech recognition error in portal:', event.error);
+          if (event.error === 'not-allowed') {
+            setSpeechError("Microphone permission denied. Check browser settings.");
+          } else {
+            setSpeechError(`Voice capture status: ${event.error}`);
+          }
+          setIsListening(false);
+        };
+
+        recognition.onend = () => {
+          setIsListening(false);
+        };
+
+        recognitionRef.current = recognition;
+        recognition.start();
+      } catch (err: any) {
+        setSpeechError("Failed to initiate voice capture driver.");
+        setIsListening(false);
+      }
+    }
+  };
 
   // Claim Form state
   const [citizenName, setCitizenName] = useState('');
@@ -331,24 +399,64 @@ export default function CountryPortal({
                   </div>
 
                   <form onSubmit={handleSearch} className="flex gap-2">
-                    <input
-                      type="text"
-                      className="flex-1 bg-slate-950 border border-slate-800 rounded-lg px-4 py-3 text-white text-sm focus:outline-none focus:border-amber-500 font-mono tracking-wide font-medium"
-                      placeholder="e.g. Dlamini, Zwane or ID sequence..."
-                      value={searchQuery}
-                      onChange={(e) => {
-                        setSearchQuery(e.target.value);
-                        if (!e.target.value) setHasSearched(false);
-                      }}
-                      required
-                    />
+                    <div className="relative flex-1">
+                      <input
+                        type="text"
+                        className="w-full bg-slate-950 border border-slate-800 rounded-lg pl-4 pr-12 py-3 text-white text-sm focus:outline-none focus:border-amber-500 font-mono tracking-wide font-medium"
+                        placeholder="e.g. Dlamini, Zwane or ID sequence..."
+                        value={searchQuery}
+                        onChange={(e) => {
+                          setSearchQuery(e.target.value);
+                          if (!e.target.value) setHasSearched(false);
+                        }}
+                        required
+                      />
+                      {speechSupported !== false && (
+                        <button
+                          type="button"
+                          id="voice-search-btn-portal"
+                          onClick={toggleListening}
+                          className={`absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-md transition-all duration-200 flex items-center justify-center cursor-pointer ${
+                            isListening
+                              ? 'bg-rose-500/20 text-rose-400 border border-rose-500/50 animate-pulse'
+                              : 'text-slate-400 hover:text-amber-500 hover:bg-slate-900 border border-transparent'
+                          }`}
+                          title="Search by voice"
+                        >
+                          {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+                          {isListening && (
+                            <span className="absolute -top-1 -right-1 flex h-2 w-2">
+                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+                              <span className="relative inline-flex rounded-full h-2 w-2 bg-rose-500"></span>
+                            </span>
+                          )}
+                        </button>
+                      )}
+                    </div>
                     <button
                       type="submit"
-                      className="bg-slate-950 cursor-pointer text-amber-400 font-semibold text-xs border border-slate-800 hover:border-amber-500 hover:bg-slate-900 px-6 rounded-lg transition-all duration-200 flex items-center gap-1.5"
+                      className="bg-slate-950 cursor-pointer text-amber-400 font-semibold text-xs border border-slate-800 hover:border-amber-500 hover:bg-slate-900 px-6 rounded-lg transition-all duration-200 flex items-center justify-center gap-1.5 shrink-0"
                     >
                       <Search className="w-4 h-4" /> Find Record
                     </button>
                   </form>
+
+                  {isListening && (
+                    <motion.div
+                      initial={{ opacity: 0, y: -5 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="flex items-center gap-2 text-xs text-rose-400 bg-rose-950/20 border border-rose-900/40 p-3 rounded-lg animate-pulse font-mono"
+                    >
+                      <span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-ping shrink-0" />
+                      <span>National Portal Voice Stream active: Speak names or ID numbers now...</span>
+                    </motion.div>
+                  )}
+
+                  {speechError && (
+                    <div className="text-xs text-amber-500 px-1 font-mono">
+                      ⚠️ Voice capture reminder: {speechError} (Confirm mic permissions or type manually)
+                    </div>
+                  )}
 
                   {/* Search explanation tip */}
                   <div className="text-[11px] text-slate-500 leading-normal flex items-start gap-1.5 bg-slate-950/40 p-3 rounded border border-slate-800/40">
